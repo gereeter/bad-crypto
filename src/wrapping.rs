@@ -1,0 +1,56 @@
+use std::ops::{Add, Sub};
+
+pub struct Wrapping<T>(pub T);
+
+impl<Lhs: WrappingAdd<Rhs>, Rhs> Add<Wrapping<Rhs>> for Wrapping<Lhs> {
+    type Output = Wrapping<<Lhs as WrappingAdd<Rhs>>::Output>;
+    fn add(self, rhs: Wrapping<Rhs>) -> Self::Output {
+        Wrapping(self.0.wrapping_add(rhs.0))
+    }
+}
+
+impl<Lhs: WrappingSub<Rhs>, Rhs> Sub<Wrapping<Rhs>> for Wrapping<Lhs> {
+    type Output = Wrapping<<Lhs as WrappingSub<Rhs>>::Output>;
+    fn sub(self, rhs: Wrapping<Rhs>) -> Self::Output {
+        Wrapping(self.0.wrapping_sub(rhs.0))
+    }
+}
+
+pub trait WrappingAdd<Rhs> {
+    type Output;
+    fn wrapping_add(self, rhs: Rhs) -> Self::Output;
+}
+
+pub trait WrappingSub<Rhs> {
+    type Output;
+    fn wrapping_sub(self, rhs: Rhs) -> Self::Output;
+}
+
+macro_rules! pod_impl {
+    { $t:ty } => {
+        impl WrappingAdd<$t> for $t {
+            type Output = $t;
+            fn wrapping_add(self, rhs: $t) -> $t {
+                self.wrapping_add(rhs)
+            }
+        }
+
+        impl WrappingSub<$t> for $t {
+            type Output = $t;
+            fn wrapping_sub(self, rhs: $t) -> $t {
+                self.wrapping_sub(rhs)
+            }
+        }
+    };
+}
+
+pod_impl! { u8 }
+pod_impl! { u16 }
+pod_impl! { u32 }
+pod_impl! { u64 }
+pod_impl! { usize }
+pod_impl! { i8 }
+pod_impl! { i16 }
+pod_impl! { i32 }
+pod_impl! { i64 }
+pod_impl! { isize }

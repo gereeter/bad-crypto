@@ -1,5 +1,5 @@
-use std::ops::{Not, BitAnd, BitOr, BitXor, Add, Sub};
-use std::num::Wrapping;
+use std::ops::{Not, BitAnd, BitOr, BitXor};
+use wrapping::{WrappingAdd, WrappingSub};
 
 /// A type designating data that will only be used in a constant time manner
 pub struct Secret<T: Copy> {
@@ -54,8 +54,8 @@ macro_rules! pod_impls {
         pod_impl! { BitAnd, bitand, $t }
         pod_impl! { BitOr, bitor, $t }
         pod_impl! { BitXor, bitxor, $t }
-        pod_impl! { Add, add, Wrapping<$t> }
-        pod_impl! { Sub, sub, Wrapping<$t> }
+        pod_impl! { WrappingAdd, wrapping_add, $t }
+        pod_impl! { WrappingSub, wrapping_sub, $t }
     };
 }
 
