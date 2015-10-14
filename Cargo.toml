@@ -1,0 +1,4 @@
+[package]
+name = "bad-crypto"
+version = "0.1.0"
+authors = ["Jonathan S <gereeter+code@gmail.com>"]
