@@ -54,3 +54,33 @@ pod_impl! { i16 }
 pod_impl! { i32 }
 pod_impl! { i64 }
 pod_impl! { isize }
+
+#[cfg(test)]
+mod tests {
+    use super::{WrappingAdd, WrappingSub};
+
+    #[test]
+    fn no_loop() {
+        assert_eq!(WrappingAdd::wrapping_add(0u8, 0u8), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0u16, 0u16), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0u32, 0u32), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0u64, 0u64), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0usize, 0usize), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0i8, 0i8), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0i16, 0i16), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0i32, 0i32), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0i64, 0i64), 0);
+        assert_eq!(WrappingAdd::wrapping_add(0isize, 0isize), 0);
+
+        assert_eq!(WrappingSub::wrapping_sub(0u8, 0u8), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0u16, 0u16), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0u32, 0u32), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0u64, 0u64), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0usize, 0usize), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0i8, 0i8), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0i16, 0i16), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0i32, 0i32), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0i64, 0i64), 0);
+        assert_eq!(WrappingSub::wrapping_sub(0isize, 0isize), 0);
+    }
+}
