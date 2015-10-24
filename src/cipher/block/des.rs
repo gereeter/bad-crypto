@@ -1,6 +1,7 @@
 use cipher::block::{BlockFn, BlockCipher};
 use cipher::block::feistel::Feistel;
 use secret::Secret;
+use truncate::Truncate;
 
 use typenum::consts::U16;
 
@@ -37,8 +38,16 @@ impl BlockCipher for Des {
     }
 }
 
+fn run_permutation(perm: &[u8], val: Secret<u64>) -> Secret<u64> {
+    let mut out = Secret::new(0);
+    for (i, src) in perm.iter().enumerate() {
+        out |= ((val >> *src as usize) & 1) << i;
+    }
+    out
+}
+
 // See FIPS Publication 46-3, Appendix 1
-const INITAL_PERMUTATION: [u8; 64] = [
+const INITIAL_PERMUTATION: [u8; 64] = [
     58, 50, 42, 34, 26, 18, 10, 2,
     60, 52, 44, 36, 28, 20, 12, 4,
     62, 54, 46, 38, 30, 22, 14, 6,
@@ -51,7 +60,8 @@ const INITAL_PERMUTATION: [u8; 64] = [
 
 // Inverse of final_permute
 fn initial_permute(block: Secret<u64>) -> (Secret<u32>, Secret<u32>) {
-    unimplemented!()
+    let ret = run_permutation(&INITIAL_PERMUTATION, block);
+    (ret.truncate(), (ret >> 32).truncate())
 }
 
 // See FIPS Publication 46-3, Appendix 1
@@ -68,7 +78,8 @@ const FINAL_PERMUTATION: [u8; 64] = [
 
 // Inverse of initial_permute
 fn final_permute(block: (Secret<u32>, Secret<u32>)) -> Secret<u64> {
-    unimplemented!()
+    let joined = Secret::<u64>::from(block.0) | (Secret::<u64>::from(block.1) << 32);
+    run_permutation(&FINAL_PERMUTATION, joined)
 }
 
 
@@ -86,7 +97,7 @@ const EXPANSION_PERMUTATION: [u8; 48] = [
 
 // Returns 48 bits
 fn expand(half_block: Secret<u32>) -> Secret<u64> {
-    unimplemented!()
+    run_permutation(&EXPANSION_PERMUTATION, Secret::<u64>::from(half_block))
 }
 
 // Takes 48 bits
@@ -104,5 +115,5 @@ const ROUND_PERMUTATION: [u8; 32] = [
 ];
 
 fn permute(block: Secret<u32>) -> Secret<u32> {
-    unimplemented!()
+    run_permutation(&ROUND_PERMUTATION, Secret::<u64>::from(block)).truncate()
 }
