@@ -28,20 +28,28 @@ pub struct Des {
 impl BlockFn for Des {
     type Block = Secret<u64>;
     fn encrypt(&self, block: Secret<u64>) -> Secret<u64> {
-        final_permute(self.inner.encrypt(initial_permute(block)))
+        final_permute(join_block(self.inner.encrypt(split_block(initial_permute(block)))))
     }
 }
 
 impl BlockCipher for Des {
     fn decrypt(&self, block: Secret<u64>) -> Secret<u64> {
-        final_permute(self.inner.decrypt(initial_permute(block)))
+        final_permute(join_block(self.inner.decrypt(split_block(initial_permute(block)))))
     }
+}
+
+fn split_block(block: Secret<u64>) -> (Secret<u32>, Secret<u32>) {
+    (block.truncate(), (block >> 32).truncate())
+}
+
+fn join_block(parts: (Secret<u32>, Secret<u32>)) -> Secret<u64> {
+    Secret::<u64>::from(parts.0) | (Secret::<u64>::from(parts.1) << 32)
 }
 
 fn run_permutation(perm: &[u8], val: Secret<u64>) -> Secret<u64> {
     let mut out = Secret::new(0);
     for (i, src) in perm.iter().enumerate() {
-        out |= ((val >> *src as usize) & 1) << i;
+        out |= ((val >> (*src as usize - 1)) & 1) << i;
     }
     out
 }
@@ -59,9 +67,8 @@ const INITIAL_PERMUTATION: [u8; 64] = [
 ];
 
 // Inverse of final_permute
-fn initial_permute(block: Secret<u64>) -> (Secret<u32>, Secret<u32>) {
-    let ret = run_permutation(&INITIAL_PERMUTATION, block);
-    (ret.truncate(), (ret >> 32).truncate())
+fn initial_permute(block: Secret<u64>) -> Secret<u64> {
+    run_permutation(&INITIAL_PERMUTATION, block)
 }
 
 // See FIPS Publication 46-3, Appendix 1
@@ -77,9 +84,8 @@ const FINAL_PERMUTATION: [u8; 64] = [
 ];
 
 // Inverse of initial_permute
-fn final_permute(block: (Secret<u32>, Secret<u32>)) -> Secret<u64> {
-    let joined = Secret::<u64>::from(block.0) | (Secret::<u64>::from(block.1) << 32);
-    run_permutation(&FINAL_PERMUTATION, joined)
+fn final_permute(block: Secret<u64>) -> Secret<u64> {
+    run_permutation(&FINAL_PERMUTATION, block)
 }
 
 
@@ -116,4 +122,20 @@ const ROUND_PERMUTATION: [u8; 32] = [
 
 fn permute(block: Secret<u32>) -> Secret<u32> {
     run_permutation(&ROUND_PERMUTATION, Secret::<u64>::from(block)).truncate()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{initial_permute, final_permute};
+
+    use secret::Secret;
+
+    #[test]
+    fn initial_final_inverses() {
+        for i in 0..64 {
+            let val = 1 << i;
+            assert_eq!(final_permute(initial_permute(Secret::new(val))).expose(), val);
+            assert_eq!(initial_permute(final_permute(Secret::new(val))).expose(), val);
+        }
+    }
 }
