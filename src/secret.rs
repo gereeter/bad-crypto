@@ -2,6 +2,7 @@ use std::convert::From;
 use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign, Shr, ShrAssign};
 use wrapping::{WrappingAdd, WrappingSub};
 use truncate::Truncate;
+use signs::{ToSigned, ToUnsigned};
 
 /// A type designating data that will only be used in a constant time manner
 pub struct Secret<T: Copy> {
@@ -83,11 +84,18 @@ macro_rules! pod_impl {
 }
 
 macro_rules! pod_impls {
-    { $t:ty } => {
+    { $signtr:ident, $signmeth:ident: $t:ty } => {
         impl Not for Secret<$t> {
             type Output = Secret<<$t as Not>::Output>;
             fn not(self) -> Self::Output {
                 Secret::new(!self.expose())
+            }
+        }
+
+        impl $signtr for Secret<$t> {
+            type Output = Secret<<$t as $signtr>::Output>;
+            fn $signmeth(self) -> Self::Output {
+                Secret::new($signtr::$signmeth(self.expose()))
             }
         }
 
@@ -100,9 +108,9 @@ macro_rules! pod_impls {
         pod_impl! { WrappingSub, wrapping_sub, $t }
     };
 
-    { $t:ty, $($rest:ty),* } => {
-        pod_impls! { $t }
-        pod_impls! { $($rest),* }
+    { $signtr:ident, $signmeth:ident: $t:ty, $($rest:ty),* } => {
+        pod_impls! { $signtr, $signmeth: $t }
+        pod_impls! { $signtr, $signmeth: $($rest),* }
 
         $(
         impl From<$rest> for Secret<$t> {
@@ -126,5 +134,5 @@ macro_rules! pod_impls {
     };
 }
 
-pod_impls! { u64, u32, u16, u8 }
-pod_impls! { i64, i32, i16, i8 }
+pod_impls! { ToSigned, to_signed: u64, u32, u16, u8 }
+pod_impls! { ToUnsigned, to_unsigned: i64, i32, i16, i8 }

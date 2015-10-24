@@ -1,7 +1,9 @@
 use cipher::block::{BlockFn, BlockCipher};
 use cipher::block::feistel::Feistel;
 use secret::Secret;
+use signs::{ToSigned, ToUnsigned};
 use truncate::Truncate;
+use wrapping::WrappingSub;
 
 use typenum::consts::U16;
 
@@ -48,8 +50,22 @@ fn join_block(parts: (Secret<u32>, Secret<u32>)) -> Secret<u64> {
 
 fn run_permutation(perm: &[u8], val: Secret<u64>) -> Secret<u64> {
     let mut out = Secret::new(0);
-    for (i, src) in perm.iter().enumerate() {
-        out |= ((val >> (*src as usize - 1)) & 1) << i;
+    for (i, &src) in perm.iter().enumerate() {
+        out |= ((val >> (src as usize - 1)) & 1) << i;
+    }
+    out
+}
+
+// S-boxes are really annoying, as indexing is not a constant time operation. We scan through the whole array masking all elements except for the one we want.
+// We assume that all input values are at most 7 bits long.
+fn run_substitution(subs: &[u8], val: Secret<u8>) -> Secret<u8> {
+    let mut out = Secret::new(0u8);
+    for (i, &sub) in subs.iter().enumerate() {
+        let correct = val ^ i as u8;
+        // To find the mask, we first subtract 1, then extend the sign bit through the whole word.
+        // Since `correct` must have its sign bit cleared, the only way for the result to be all ones is if `correct` is 0.
+        let mask = (correct.wrapping_sub(1).to_signed() >> 7).to_unsigned();
+        out |= mask & sub;
     }
     out
 }
@@ -71,7 +87,12 @@ fn expand(half_block: Secret<u32>) -> Secret<u64> {
 
 // Takes 48 bits
 fn substitute(block: Secret<u64>) -> Secret<u32> {
-    unimplemented!()
+    let mut out = Secret::new(0);
+    for i in 0..8 {
+        let chunk = ((block >> i*6) & 0x3F).truncate();
+        out |= Secret::<u32>::from(run_substitution(&tables::SUBSTITUTIONS[i], chunk)) << i*4;
+    }
+    out
 }
 
 fn permute(block: Secret<u32>) -> Secret<u32> {
@@ -118,6 +139,291 @@ mod tables {
         1,  15, 23, 26, 5,  18, 31, 10,
         2,  8,  24, 14, 32, 27, 3,  9,
         19, 13, 30, 6,  22, 11, 4,  25
+    ];
+
+    // NB: These are in lexicographic order, not the outer-bit major order given in the spec.
+    pub const SUBSTITUTIONS: [[u8; 64]; 8] = [
+        [
+            14, 0,
+            4,  15,
+            13, 7,
+            1,  4,
+            2,  14,
+            15, 2,
+            11, 13,
+            8,  1,
+            3,  10,
+            10, 6,
+            6,  12,
+            12, 11,
+            5,  9,
+            9,  5,
+            0,  3,
+            7,  8,
+
+            4,  15,
+            1,  12,
+            14, 8,
+            8,  2,
+            13, 4,
+            6,  9,
+            2,  1,
+            11, 7,
+            15, 5,
+            12, 11,
+            9,  3,
+            7,  14,
+            3,  10,
+            10, 0,
+            5,  6,
+            0,  13,
+        ],
+        [
+            15, 3,
+            1, 13,
+            8, 4,
+            14, 7,
+            6, 15,
+            11, 2,
+            3, 8,
+            4, 14,
+            9, 12,
+            7, 0,
+            2, 1,
+            13, 10,
+            12, 6,
+            0, 9,
+            5, 11,
+            10, 5,
+
+            0, 13,
+            14, 8,
+            7, 10,
+            11, 1,
+            10, 3,
+            4, 15,
+            13, 4,
+            1, 2,
+            5, 11,
+            8, 6,
+            12, 7,
+            6, 12,
+            9, 0,
+            3, 5,
+            2, 14,
+            15, 9,
+        ],
+        [
+            10, 13,
+            0, 7,
+            9, 0,
+            14, 9,
+            6, 3,
+            3, 4,
+            15, 6,
+            5, 10,
+            1, 2,
+            13, 8,
+            12, 5,
+            7, 14,
+            11, 12,
+            4, 11,
+            2, 15,
+            8, 1,
+
+            13, 1,
+            6, 10,
+            4, 13,
+            9, 0,
+            8, 6,
+            15, 9,
+            3, 8,
+            0, 7,
+            11, 4,
+            1, 15,
+            2, 14,
+            12, 3,
+            5, 11,
+            10, 5,
+            14, 2,
+            7, 12,
+        ],
+        [
+            7, 13,
+            13, 8,
+            14, 11,
+            3, 9,
+            0, 3,
+            6, 4,
+            9, 6,
+            10, 10,
+            1, 2,
+            2, 8,
+            8, 5,
+            5, 14,
+            11, 12,
+            12, 11,
+            4, 15,
+            15, 1,
+
+            10, 3,
+            6, 15,
+            9, 0,
+            9, 6,
+            8, 10,
+            15, 1,
+            3, 13,
+            0, 8,
+            11, 9,
+            1, 4,
+            2, 5,
+            12, 11,
+            5, 12,
+            10, 7,
+            14, 2,
+            7, 14,
+        ],
+        [
+            2, 14,
+            12, 11,
+            4, 2,
+            1, 9,
+            7, 3,
+            10, 4,
+            11, 6,
+            6, 10,
+            8, 2,
+            5, 8,
+            3, 5,
+            15, 14,
+            13, 12,
+            0, 11,
+            14, 15,
+            9, 1,
+
+            4, 11,
+            2, 8,
+            1, 12,
+            9, 7,
+            8, 1,
+            15, 14,
+            3, 2,
+            0, 13,
+            11, 6,
+            1, 15,
+            2, 0,
+            12, 9,
+            5, 10,
+            10, 4,
+            14, 5,
+            7, 3,
+        ],
+        [
+            12, 10,
+            1, 15,
+            10, 4,
+            15, 9,
+            9, 3,
+            2, 4,
+            6, 6,
+            8, 10,
+            0, 2,
+            13, 8,
+            3, 5,
+            4, 14,
+            14, 12,
+            7, 11,
+            5, 15,
+            11, 1,
+
+            9, 4,
+            14, 3,
+            15, 2,
+            9, 12,
+            8, 9,
+            15, 5,
+            3, 15,
+            0, 10,
+            11, 11,
+            1, 14,
+            2, 1,
+            12, 7,
+            5, 6,
+            10, 0,
+            14, 8,
+            7, 13,
+
+        ],
+        [
+            4, 13,
+            11, 0,
+            2, 11,
+            14, 9,
+            15, 3,
+            0, 4,
+            8, 6,
+            13, 10,
+            3, 2,
+            12, 8,
+            9, 5,
+            7, 14,
+            5, 12,
+            10, 11,
+            6, 15,
+            1, 1,
+
+            1, 6,
+            4, 11,
+            11, 13,
+            9, 8,
+            8, 1,
+            15, 4,
+            3, 10,
+            0, 7,
+            11, 9,
+            1, 5,
+            2, 0,
+            12, 15,
+            5, 14,
+            10, 2,
+            14, 3,
+            7, 12,
+        ],
+        [
+            13, 1,
+            2, 15,
+            8, 13,
+            4, 9,
+            6, 3,
+            15, 4,
+            11, 6,
+            1, 10,
+            10, 2,
+            9, 8,
+            3, 5,
+            14, 14,
+            5, 12,
+            0, 11,
+            12, 15,
+            7, 1,
+
+            7, 2,
+            11, 1,
+            4, 14,
+            9, 7,
+            8, 4,
+            15, 10,
+            3, 8,
+            0, 13,
+            11, 15,
+            1, 12,
+            2, 9,
+            12, 0,
+            5, 3,
+            10, 5,
+            14, 6,
+            7, 11,
+        ]
     ];
 }
 
