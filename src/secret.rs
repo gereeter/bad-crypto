@@ -1,6 +1,7 @@
 use std::convert::From;
 use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign, Shr, ShrAssign};
 use wrapping::{WrappingAdd, WrappingSub};
+use truncate::Truncate;
 
 /// A type designating data that will only be used in a constant time manner
 pub struct Secret<T: Copy> {
@@ -113,6 +114,12 @@ macro_rules! pod_impls {
         impl From<Secret<$rest>> for Secret<$t> {
             fn from(val: Secret<$rest>) -> Secret<$t> {
                 Secret::new(From::from(val.expose()))
+            }
+        }
+
+        impl Truncate<Secret<$rest>> for Secret<$t> {
+            fn truncate(self) -> Secret<$rest> {
+                Secret::new(Truncate::truncate(self.expose()))
             }
         }
         )*

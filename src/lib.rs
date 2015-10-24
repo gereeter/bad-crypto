@@ -9,3 +9,4 @@ pub mod secret;
 
 mod wrapping;
 mod nodrop;
+mod truncate;
