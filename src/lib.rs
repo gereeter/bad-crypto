@@ -1,12 +1,11 @@
+#![feature(core_intrinsics)]
+
 extern crate typenum;
 
+pub mod array;
+pub mod cipher;
 pub mod keyed;
 pub mod secret;
-pub mod cipher;
 
 mod wrapping;
-mod array;
-
-#[test]
-fn it_works() {
-}
+mod nodrop;

@@ -8,6 +8,8 @@ use typenum::bit::{B0, B1};
 use typenum::consts::{U0, U1};
 use typenum::uint::{Unsigned, UInt, UTerm};
 
+use nodrop::NoDrop;
+
 pub struct Array<T, Len: ArrayLength<T>> {
     data: Len::Array,
     _marker: PhantomData<T>
@@ -46,6 +48,23 @@ impl<T> Array<T, U0> {
 }
 
 impl<T, Len: ArrayLength<T>> Array<T, Len> {
+    pub fn map<U, F: FnMut(T) -> U>(self, mut func: F) -> Array<U, Len> where Len: ArrayLength<U> {
+        unsafe {
+            let this = NoDrop::new(self);
+
+            let mut output = NoDrop::new(Array {
+                data: mem::uninitialized(),
+                _marker: PhantomData
+            });
+
+            for (outp, inp) in output.iter_mut().zip(this.iter()) {
+                ptr::write(outp, func(ptr::read(inp)));
+            }
+
+            output.into_inner()
+        }
+    }
+
     pub fn push(self, val: T) -> Array<T, <Len as Add<U1>>::Output>
             where Len: Add<U1>, <Len as Add<U1>>::Output: ArrayLength<T> {
         unsafe {
@@ -139,5 +158,11 @@ mod tests {
         let arr1 = Array::new().push(1).push(2).push(3);
         let arr2 = Array::new().push(4).push(5);
         assert_eq!(&*arr1.append(arr2), [1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_map() {
+        let arr = Array::new().push(1).push(2).push(3).push(4).push(5).map(|x| x * 2);
+        assert_eq!(&*arr, [2, 4, 6, 8, 10]);
     }
 }

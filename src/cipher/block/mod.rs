@@ -1,7 +1,7 @@
 pub mod feistel;
 
 pub trait BlockFn {
-    type Block: Copy;
+    type Block: Clone;
     fn encrypt(&self, block: Self::Block) -> Self::Block;
 }
 
