@@ -1,4 +1,5 @@
 pub mod feistel;
+pub mod des;
 
 pub trait BlockFn {
     type Block: Clone;

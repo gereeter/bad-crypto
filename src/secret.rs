@@ -6,6 +6,13 @@ pub struct Secret<T: Copy> {
     inner: T
 }
 
+impl<T: Copy> Copy for Secret<T> { }
+impl<T: Copy> Clone for Secret<T> {
+    fn clone(&self) -> Secret<T> {
+        *self
+    }
+}
+
 impl<T: Copy> Secret<T> {
     pub fn new(val: T) -> Secret<T> {
         Secret { inner: val }
