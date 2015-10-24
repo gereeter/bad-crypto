@@ -1,4 +1,4 @@
-use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign};
+use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign, Shr, ShrAssign};
 use wrapping::{WrappingAdd, WrappingSub};
 
 /// A type designating data that will only be used in a constant time manner
@@ -63,6 +63,21 @@ macro_rules! pod_impl {
             }
         }
     };
+
+    { shift, $tr:ident, $method:ident, $trassign:ident, $methodassign: ident, $t:ty } => {
+        impl $tr<usize> for Secret<$t> {
+            type Output = Secret<<$t as $tr<$t>>::Output>;
+            fn $method(self, rhs: usize) -> Self::Output {
+                Secret::new($tr::$method(self.expose(), rhs))
+            }
+        }
+
+        impl $trassign<usize> for Secret<$t> {
+            fn $methodassign(&mut self, rhs: usize) {
+                $trassign::$methodassign(&mut self.inner, rhs);
+            }
+        }
+    }
 }
 
 macro_rules! pod_impls {
@@ -77,6 +92,8 @@ macro_rules! pod_impls {
         pod_impl! { BitAnd, bitand, BitAndAssign, bitand_assign, $t }
         pod_impl! { BitOr, bitor, BitOrAssign, bitor_assign, $t }
         pod_impl! { BitXor, bitxor, BitXorAssign, bitxor_assign, $t }
+        pod_impl! { shift, Shl, shl, ShlAssign, shl_assign, $t }
+        pod_impl! { shift, Shr, shr, ShrAssign, shr_assign, $t }
         pod_impl! { WrappingAdd, wrapping_add, $t }
         pod_impl! { WrappingSub, wrapping_sub, $t }
     };
