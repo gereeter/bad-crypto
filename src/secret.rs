@@ -1,3 +1,4 @@
+use std::convert::From;
 use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign, Shr, ShrAssign};
 use wrapping::{WrappingAdd, WrappingSub};
 
@@ -97,15 +98,26 @@ macro_rules! pod_impls {
         pod_impl! { WrappingAdd, wrapping_add, $t }
         pod_impl! { WrappingSub, wrapping_sub, $t }
     };
+
+    { $t:ty, $($rest:ty),* } => {
+        pod_impls! { $t }
+        pod_impls! { $($rest),* }
+
+        $(
+        impl From<$rest> for Secret<$t> {
+            fn from(val: $rest) -> Secret<$t> {
+                Secret::new(From::from(val))
+            }
+        }
+
+        impl From<Secret<$rest>> for Secret<$t> {
+            fn from(val: Secret<$rest>) -> Secret<$t> {
+                Secret::new(From::from(val.expose()))
+            }
+        }
+        )*
+    };
 }
 
-pod_impls! { u8 }
-pod_impls! { u16 }
-pod_impls! { u32 }
-pod_impls! { u64 }
-pod_impls! { usize }
-pod_impls! { i8 }
-pod_impls! { i16 }
-pod_impls! { i32 }
-pod_impls! { i64 }
-pod_impls! { isize }
+pod_impls! { u64, u32, u16, u8 }
+pod_impls! { i64, i32, i16, i8 }
