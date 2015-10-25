@@ -391,11 +391,20 @@ mod tests {
     }
 
     #[bench]
+    fn bench_baseline(bencher: &mut Bencher) {
+        bencher.iter(|| {
+            for _ in 0..1000 {
+                test::black_box(());
+            }
+        });
+    }
+
+    #[bench]
     fn bench_initial_permute(bencher: &mut Bencher) {
         let input = thread_rng().gen();
         bencher.iter(|| {
             for _ in 0..1000 {
-                test::black_box(initial_permute(Secret::new(input)));
+                test::black_box(initial_permute(Secret::new(test::black_box(input))));
             }
         });
     }
@@ -405,7 +414,7 @@ mod tests {
         let input = thread_rng().gen();
         bencher.iter(|| {
             for _ in 0..1000 {
-                test::black_box(final_permute(Secret::new(input)));
+                test::black_box(final_permute(Secret::new(test::black_box(input))));
             }
         });
     }
@@ -415,7 +424,7 @@ mod tests {
         let input = thread_rng().gen();
         bencher.iter(|| {
             for _ in 0..1000 {
-                test::black_box(expand(Secret::new(input)));
+                test::black_box(expand(Secret::new(test::black_box(input))));
             }
         });
     }
@@ -424,7 +433,7 @@ mod tests {
     fn bench_substitute(bencher: &mut Bencher) {
         let input = thread_rng().gen::<u64>() >> 16;
         bencher.iter(|| {
-            substitute(Secret::new(input))
+            substitute(Secret::new(test::black_box(input)))
         });
     }
 
@@ -432,7 +441,7 @@ mod tests {
     fn bench_permute(bencher: &mut Bencher) {
         let input = thread_rng().gen();
         bencher.iter(|| {
-            permute(Secret::new(input))
+            permute(Secret::new(test::black_box(input)))
         });
     }
 }
