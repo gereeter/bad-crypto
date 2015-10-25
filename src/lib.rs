@@ -7,6 +7,7 @@ pub mod cipher;
 pub mod keyed;
 pub mod secret;
 
+mod rotate;
 mod wrapping;
 mod nodrop;
 mod truncate;

@@ -1,8 +1,9 @@
 use std::convert::From;
 use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign, Shr, ShrAssign};
-use wrapping::{WrappingAdd, WrappingSub};
-use truncate::Truncate;
+use rotate::{RotateLeft, RotateRight};
 use signs::{ToSigned, ToUnsigned};
+use truncate::Truncate;
+use wrapping::{WrappingAdd, WrappingSub};
 
 /// A type designating data that will only be used in a constant time manner
 pub struct Secret<T: Copy> {
@@ -67,20 +68,24 @@ macro_rules! pod_impl {
         }
     };
 
-    { shift, $tr:ident, $method:ident, $trassign:ident, $methodassign: ident, $t:ty } => {
-        impl $tr<usize> for Secret<$t> {
-            type Output = Secret<<$t as $tr<$t>>::Output>;
-            fn $method(self, rhs: usize) -> Self::Output {
+    { shift: $tr:ident, $method:ident, $t:ty } => {
+        impl $tr<u32> for Secret<$t> {
+            type Output = Secret<<$t as $tr<u32>>::Output>;
+            fn $method(self, rhs: u32) -> Self::Output {
                 Secret::new($tr::$method(self.expose(), rhs))
             }
         }
+    };
 
-        impl $trassign<usize> for Secret<$t> {
-            fn $methodassign(&mut self, rhs: usize) {
+    { shift: $tr:ident, $method:ident, $trassign:ident, $methodassign: ident, $t:ty } => {
+        pod_impl! { shift: $tr, $method, $t }
+
+        impl $trassign<u32> for Secret<$t> {
+            fn $methodassign(&mut self, rhs: u32) {
                 $trassign::$methodassign(&mut self.inner, rhs);
             }
         }
-    }
+    };
 }
 
 macro_rules! pod_impls {
@@ -102,8 +107,10 @@ macro_rules! pod_impls {
         pod_impl! { BitAnd, bitand, BitAndAssign, bitand_assign, $t }
         pod_impl! { BitOr, bitor, BitOrAssign, bitor_assign, $t }
         pod_impl! { BitXor, bitxor, BitXorAssign, bitxor_assign, $t }
-        pod_impl! { shift, Shl, shl, ShlAssign, shl_assign, $t }
-        pod_impl! { shift, Shr, shr, ShrAssign, shr_assign, $t }
+        pod_impl! { shift: Shl, shl, ShlAssign, shl_assign, $t }
+        pod_impl! { shift: Shr, shr, ShrAssign, shr_assign, $t }
+        pod_impl! { shift: RotateLeft, rotate_left, $t }
+        pod_impl! { shift: RotateRight, rotate_right, $t }
         pod_impl! { WrappingAdd, wrapping_add, $t }
         pod_impl! { WrappingSub, wrapping_sub, $t }
     };

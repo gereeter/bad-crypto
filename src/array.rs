@@ -48,6 +48,21 @@ impl<T> Array<T, U0> {
 }
 
 impl<T, Len: ArrayLength<T>> Array<T, Len> {
+    pub fn from_fn<F: FnMut(usize) -> T>(mut func: F) -> Array<T, Len> {
+        unsafe {
+            let mut output = NoDrop::new(Array {
+                data: mem::uninitialized(),
+                _marker: PhantomData
+            });
+
+            for (i, slot) in output.iter_mut().enumerate() {
+                ptr::write(slot, func(i));
+            }
+
+            output.into_inner()
+        }
+    }
+
     pub fn map<U, F: FnMut(T) -> U>(self, mut func: F) -> Array<U, Len> where Len: ArrayLength<U> {
         unsafe {
             let this = NoDrop::new(self);
