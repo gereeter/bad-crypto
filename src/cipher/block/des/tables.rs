@@ -24,6 +24,7 @@ pub const FINAL_PERMUTATION: [u8; 64] = [
    33, 1, 41, 9,  49, 17, 57, 25
 ];
 
+#[cfg(test)]
 pub const EXPANSION_PERMUTATION: [u8; 48] = [
     32, 1,  2,  3,  4,  5,
     4,  5,  6,  7,  8,  9,

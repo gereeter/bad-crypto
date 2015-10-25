@@ -237,8 +237,23 @@ fn final_permute(mut block: Secret<u64>) -> Secret<u64> {
 }
 
 // Returns 48 bits
+//
+// # Optimization
+//
+// For the most part, the expansion permutation copies contiguous 6-bit chunks of bits from
+// the input to the output. We do this directly.
 fn expand(half_block: Secret<u32>) -> Secret<u64> {
-    run_permutation(&tables::EXPANSION_PERMUTATION, Secret::<u64>::from(half_block), 32, 48)
+    let half_block = Secret::<u64>::from(half_block);
+
+    (half_block & 1) << 47 | (half_block & 0x80000000) >> 31
+        | (half_block & 0xF8000000) << 15
+        | (half_block & 0x1F800000) << 13
+        | (half_block & 0x01F80000) << 11
+        | (half_block & 0x001F8000) << 9
+        | (half_block & 0x0001F800) << 7
+        | (half_block & 0x00001F80) << 5
+        | (half_block & 0x000001F8) << 3
+        | (half_block & 0x0000001F) << 1
 }
 
 // Takes 48 bits
@@ -296,6 +311,15 @@ mod tests {
         for _ in 0..10000 {
             let val = rng.gen();
             assert_eq!(final_permute(Secret::new(val)).expose(), run_permutation(&tables::FINAL_PERMUTATION, Secret::new(val), 64, 64).expose());
+        }
+    }
+
+    #[test]
+    fn expand_matches_spec_rand() {
+        let mut rng = thread_rng();
+        for _ in 0..10000 {
+            let val = rng.gen();
+            assert_eq!(expand(Secret::new(val)).expose(), run_permutation(&tables::EXPANSION_PERMUTATION, Secret::new(val as u64), 32, 48).expose());
         }
     }
 
@@ -390,7 +414,9 @@ mod tests {
     fn bench_expand(bencher: &mut Bencher) {
         let input = thread_rng().gen();
         bencher.iter(|| {
-            expand(Secret::new(input))
+            for _ in 0..1000 {
+                test::black_box(expand(Secret::new(input)));
+            }
         });
     }
 
