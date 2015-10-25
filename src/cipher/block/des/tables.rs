@@ -1,5 +1,6 @@
 // See FIPS Publication 46-3, Appendix 1
 
+#[cfg(test)]
 pub const INITIAL_PERMUTATION: [u8; 64] = [
     58, 50, 42, 34, 26, 18, 10, 2,
     60, 52, 44, 36, 28, 20, 12, 4,
@@ -11,6 +12,7 @@ pub const INITIAL_PERMUTATION: [u8; 64] = [
     63, 55, 47, 39, 31, 23, 15, 7
 ];
 
+#[cfg(test)]
 pub const FINAL_PERMUTATION: [u8; 64] = [
    40, 8, 48, 16, 56, 24, 64, 32,
    39, 7, 47, 15, 55, 23, 63, 31,

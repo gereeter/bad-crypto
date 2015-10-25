@@ -110,14 +110,130 @@ fn run_substitution(subs: &[u8], val: Secret<u8>) -> Secret<u8> {
     out
 }
 
+#[inline(always)]
+fn do_swap(block: &mut Secret<u64>, location: u64, offset: u32) {
+    let temp = ((*block << offset) ^ *block) & location;
+    *block ^= temp;
+    *block ^= temp >> offset;
+}
+
 // Inverse of final_permute
-fn initial_permute(block: Secret<u64>) -> Secret<u64> {
-    run_permutation(&tables::INITIAL_PERMUTATION, block, 64, 64)
+//
+// # Optimization
+//
+// The process of calculating the initial permutation can be substantially optimized
+// from a straightforward bit-by-bit process. The first observation to make is that
+// since `initial_permute` is invertible, it can be broken down into a series of swaps.
+// Due to the xor-swaps, these can be done cheaply and with many bits at once.
+//
+// The second observation is that the permutation itself is very structured. We need to
+// send
+//
+//     1  2  3  4  5  6  7  8      58 50 42 34 26 10 2
+//     9  10 11 12 13 14 15 16     60 52 44 36 28 12 4
+//     17 18 19 20 21 22 23 24     62 54 46 38 30 14 6
+//     25 26 27 28 29 30 31 32  -\ 64 56 48 40 32 16 8
+//     33 34 35 36 37 38 39 40  -/ 57 49 41 33 25 9  1
+//     41 42 43 44 45 46 47 48     59 51 43 35 27 11 3
+//     49 50 51 52 53 54 55 56     61 53 45 37 29 13 5
+//     57 58 59 60 61 62 63 64     63 55 47 39 31 15 7
+//
+// From straightforward visual inspection, this can be broken down into reflecting the
+// block of bits across this upper right-lower left diagonal and permuting the resulting
+// rows. Reflection can be done as a series of swaps by doing multiple "block-level" reflections:
+//
+//   do_swap(&mut block, 0xF0F0F0F000000000, 36)
+//     1  2  3  4  5  6  7  8      37 38 39 40 5  6  7  8
+//     9  10 11 12 13 14 15 16     45 46 47 48 13 14 15 16
+//     17 18 19 20 21 22 23 24     53 54 55 56 21 22 23 24
+//     25 26 27 28 29 30 31 32  -\ 61 62 63 64 29 30 31 32
+//     33 34 35 36 37 38 39 40  -/ 33 34 35 36 1  2  3  4
+//     41 42 43 44 45 46 47 48     41 42 43 44 9  10 11 12
+//     49 50 51 52 53 54 55 56     49 50 51 52 17 18 19 20
+//     57 58 59 60 61 62 63 64     57 58 59 60 25 26 27 28
+//
+//   do_swap(&mut block, 0xCCCC0000CCCC0000, 18)
+//     37 38 39 40 5  6  7  8      55 56 39 40 23 24 7  8
+//     45 46 47 48 13 14 15 16     63 64 47 48 31 32 15 16
+//     53 54 55 56 21 22 23 24     53 54 37 38 21 22 5  6
+//     61 62 63 64 29 30 31 32  -\ 61 62 45 46 29 30 13 14
+//     33 34 35 36 1  2  3  4   -/ 51 52 35 36 19 20 3  4
+//     41 42 43 44 9  10 11 12     59 60 43 44 27 28 11 12
+//     49 50 51 52 17 18 19 20     49 50 33 34 17 18 1  2
+//     57 58 59 60 25 26 27 28     57 58 41 42 25 26 9  10
+//
+// At this point, we would finish the reflection with
+//
+//   do_swap(&mut block, 0xAA00AA00AA00AA00, 9);
+//     55 56 39 40 23 24 7  8      64 56 48 40 32 24 16 8
+//     63 64 47 48 31 32 15 16     63 55 47 39 31 23 15 7
+//     53 54 37 38 21 22 5  6      62 54 46 38 30 22 14 6
+//     61 62 45 46 29 30 13 14  -\ 61 53 45 37 29 21 13 5
+//     51 52 35 36 19 20 3  4   -/ 60 52 44 36 28 20 12 4
+//     59 60 43 44 27 28 11 12     59 51 43 35 27 19 11 3
+//     49 50 51 52 17 18 1  2      58 50 42 34 26 18 10 2
+//     57 58 59 60 25 26 9  10     57 49 41 33 25 17 9  1
+//
+// However, the intermediate structure after two swaps has much of the structure
+// that we want to do the final row permute - notice that the odd numbers that
+// need to be separated from the evens are already in two separate columns. All we
+// need to do is reverse the order:
+//
+//   do_swap(&mut block, 0xFF000000FF000000, 24);
+//     55 56 39 40 23 24 7  8      61 62 45 46 29 30 13 14
+//     63 64 47 48 31 32 15 16     63 64 47 48 31 32 15 16
+//     53 54 37 38 21 22 5  6      53 54 37 38 21 22 5  6
+//     61 62 45 46 29 30 13 14  -\ 55 56 39 40 23 24 7  8
+//     51 52 35 36 19 20 3  4   -/ 57 58 41 42 25 26 9  10
+//     59 60 43 44 27 28 11 12     59 60 43 44 27 28 11 12
+//     49 50 33 34 17 18 1  2      49 50 33 34 17 18 1  2
+//     57 58 41 42 25 26 9  10     51 52 35 36 19 20 3  4
+//
+//   do_swap(&mut block, 0xFFFF000000000000, 48);
+//     61 62 45 46 29 30 13 14     49 50 33 34 17 18 1  2
+//     63 64 47 48 31 32 15 16     51 52 35 36 19 20 3  4
+//     53 54 37 38 21 22 5  6      53 54 37 38 21 22 5  6
+//     55 56 39 40 23 24 7  8   -\ 55 56 39 40 23 24 7  8
+//     57 58 41 42 25 26 9  10  -/ 57 58 41 42 25 26 9  10
+//     59 60 43 44 27 28 11 12     59 60 43 44 27 28 11 12
+//     49 50 33 34 17 18 1  2      61 62 45 46 29 30 13 14
+//     51 52 35 36 19 20 3  4      63 64 47 48 31 32 15 16
+//
+// At this point, we are almost done: the odd numbers that are still on top need to be
+// put onto the bottom.
+//
+//   do_swap(&mut block, 0xAAAAAAAA00000000, 33);
+//     49 50 33 34 17 18 1  2      58 50 42 34 26 10 2
+//     51 52 35 36 19 20 3  4      60 52 44 36 28 12 4
+//     53 54 37 38 21 22 5  6      62 54 46 38 30 14 6
+//     55 56 39 40 23 24 7  8   -\ 64 56 48 40 32 16 8
+//     57 58 41 42 25 26 9  10  -/ 57 49 41 33 25 9  1
+//     59 60 43 44 27 28 11 12     59 51 43 35 27 11 3
+//     61 62 45 46 29 30 13 14     61 53 45 37 29 13 5
+//     63 64 47 48 31 32 15 16     63 55 47 39 31 15 7
+//
+// This completes the permutation.
+//
+// TODO: look at 32 bit performance
+fn initial_permute(mut block: Secret<u64>) -> Secret<u64> {
+    do_swap(&mut block, 0xF0F0F0F000000000, 36);
+    do_swap(&mut block, 0xCCCC0000CCCC0000, 18);
+    do_swap(&mut block, 0xFF000000FF000000, 24);
+    do_swap(&mut block, 0xFFFF000000000000, 48);
+    do_swap(&mut block, 0xAAAAAAAA00000000, 33);
+
+    block
 }
 
 // Inverse of initial_permute
-fn final_permute(block: Secret<u64>) -> Secret<u64> {
-    run_permutation(&tables::FINAL_PERMUTATION, block, 64, 64)
+fn final_permute(mut block: Secret<u64>) -> Secret<u64> {
+    // Since a swap is its own inverse, we just do the swaps of initial_permute backwards
+    do_swap(&mut block, 0xAAAAAAAA00000000, 33);
+    do_swap(&mut block, 0xFFFF000000000000, 48);
+    do_swap(&mut block, 0xFF000000FF000000, 24);
+    do_swap(&mut block, 0xCCCC0000CCCC0000, 18);
+    do_swap(&mut block, 0xF0F0F0F000000000, 36);
+    block
 }
 
 // Returns 48 bits
@@ -145,7 +261,9 @@ mod tests {
     extern crate test;
     extern crate rand;
 
-    use super::{Des, initial_permute, final_permute, run_substitution, key_schedule, expand, substitute, permute};
+    use super::{Des, key_schedule, initial_permute, final_permute, expand, substitute, permute};
+    use super::{run_permutation, run_substitution};
+    use super::tables;
 
     use cipher::block::{BlockFn, BlockCipher};
     use keyed::Keyed;
@@ -160,6 +278,24 @@ mod tests {
             let val = 1 << i;
             assert_eq!(final_permute(initial_permute(Secret::new(val))).expose(), val);
             assert_eq!(initial_permute(final_permute(Secret::new(val))).expose(), val);
+        }
+    }
+
+    #[test]
+    fn initial_matches_spec_rand() {
+        let mut rng = thread_rng();
+        for _ in 0..10000 {
+            let val = rng.gen();
+            assert_eq!(initial_permute(Secret::new(val)).expose(), run_permutation(&tables::INITIAL_PERMUTATION, Secret::new(val), 64, 64).expose());
+        }
+    }
+
+    #[test]
+    fn final_matches_spec_rand() {
+        let mut rng = thread_rng();
+        for _ in 0..10000 {
+            let val = rng.gen();
+            assert_eq!(final_permute(Secret::new(val)).expose(), run_permutation(&tables::FINAL_PERMUTATION, Secret::new(val), 64, 64).expose());
         }
     }
 
@@ -234,7 +370,9 @@ mod tests {
     fn bench_initial_permute(bencher: &mut Bencher) {
         let input = thread_rng().gen();
         bencher.iter(|| {
-            initial_permute(Secret::new(input))
+            for _ in 0..1000 {
+                test::black_box(initial_permute(Secret::new(input)));
+            }
         });
     }
 
@@ -242,7 +380,9 @@ mod tests {
     fn bench_final_permute(bencher: &mut Bencher) {
         let input = thread_rng().gen();
         bencher.iter(|| {
-            final_permute(Secret::new(input))
+            for _ in 0..1000 {
+                test::black_box(final_permute(Secret::new(input)));
+            }
         });
     }
 
