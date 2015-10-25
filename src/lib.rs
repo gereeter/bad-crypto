@@ -1,4 +1,5 @@
 #![feature(core_intrinsics, op_assign_traits, augmented_assignments)]
+#![cfg_attr(test, feature(test))]
 
 extern crate typenum;
 

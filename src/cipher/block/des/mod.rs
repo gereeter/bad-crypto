@@ -142,11 +142,17 @@ fn permute(block: Secret<u32>) -> Secret<u32> {
 
 #[cfg(test)]
 mod tests {
+    extern crate test;
+    extern crate rand;
+
     use super::{Des, initial_permute, final_permute, run_substitution, key_schedule, expand, substitute, permute};
 
     use cipher::block::{BlockFn, BlockCipher};
     use keyed::Keyed;
     use secret::Secret;
+
+    use self::test::Bencher;
+    use self::rand::{Rng, thread_rng};
 
     #[test]
     fn initial_final_inverses() {
@@ -222,5 +228,45 @@ mod tests {
         let des = Des::from_key(Secret::new(0x0E329232EA6D0D73));
         assert_eq!(des.encrypt(Secret::new(0x8787878787878787)).expose(), 0);
         assert_eq!(des.decrypt(Secret::new(0)).expose(), 0x8787878787878787);
+    }
+
+    #[bench]
+    fn bench_initial_permute(bencher: &mut Bencher) {
+        let input = thread_rng().gen();
+        bencher.iter(|| {
+            initial_permute(Secret::new(input))
+        });
+    }
+
+    #[bench]
+    fn bench_final_permute(bencher: &mut Bencher) {
+        let input = thread_rng().gen();
+        bencher.iter(|| {
+            final_permute(Secret::new(input))
+        });
+    }
+
+    #[bench]
+    fn bench_expand(bencher: &mut Bencher) {
+        let input = thread_rng().gen();
+        bencher.iter(|| {
+            expand(Secret::new(input))
+        });
+    }
+
+    #[bench]
+    fn bench_substitute(bencher: &mut Bencher) {
+        let input = thread_rng().gen::<u64>() >> 16;
+        bencher.iter(|| {
+            substitute(Secret::new(input))
+        });
+    }
+
+    #[bench]
+    fn bench_permute(bencher: &mut Bencher) {
+        let input = thread_rng().gen();
+        bencher.iter(|| {
+            permute(Secret::new(input))
+        });
     }
 }
