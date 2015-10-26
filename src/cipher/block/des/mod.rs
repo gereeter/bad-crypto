@@ -429,4 +429,13 @@ mod tests {
             permute(Secret::new(test::black_box(input)))
         });
     }
+
+    #[bench]
+    fn bench_encrypt(bencher: &mut Bencher) {
+        let des = Des::from_key(Secret::new(thread_rng().gen()));
+        let input = thread_rng().gen();
+        bencher.iter(|| {
+            des.encrypt(Secret::new(test::black_box(input)))
+        });
+    }
 }
