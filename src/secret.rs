@@ -1,9 +1,9 @@
 use std::convert::From;
 use std::ops::{Not, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Shl, ShlAssign, Shr, ShrAssign};
-use rotate::{RotateLeft, RotateRight};
-use signs::{ToSigned, ToUnsigned};
-use truncate::Truncate;
-use wrapping::{WrappingAdd, WrappingSub};
+use utils::traits::rotate::{RotateLeft, RotateRight};
+use utils::traits::signs::{ToSigned, ToUnsigned};
+use utils::traits::truncate::Truncate;
+use utils::traits::wrapping::{WrappingAdd, WrappingSub};
 
 /// A type designating data that will only be used in a constant time manner
 pub struct Secret<T: Copy> {

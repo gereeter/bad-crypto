@@ -3,9 +3,9 @@ use cipher::block::feistel::Feistel;
 use keyed::Keyed;
 use secret::Secret;
 
-use signs::{ToSigned, ToUnsigned};
-use truncate::Truncate;
-use wrapping::WrappingSub;
+use utils::traits::signs::{ToSigned, ToUnsigned};
+use utils::traits::truncate::Truncate;
+use utils::traits::wrapping::WrappingSub;
 use array::Array;
 
 use typenum::consts::U16;

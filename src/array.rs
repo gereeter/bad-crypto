@@ -8,7 +8,7 @@ use typenum::bit::{B0, B1};
 use typenum::consts::{U0, U1};
 use typenum::uint::{Unsigned, UInt, UTerm};
 
-use nodrop::NoDrop;
+use utils::nodrop::NoDrop;
 
 pub struct Array<T, Len: ArrayLength<T>> {
     data: Len::Array,
