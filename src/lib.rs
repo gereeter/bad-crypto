@@ -7,5 +7,6 @@ pub mod array;
 pub mod cipher;
 pub mod keyed;
 pub mod secret;
+pub mod permutation;
 
 mod utils;
